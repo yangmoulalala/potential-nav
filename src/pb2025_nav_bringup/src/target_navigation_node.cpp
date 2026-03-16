@@ -50,7 +50,7 @@ void TargetNavigationNode::targetPositionCallback(const geometry_msgs::msg::Poin
   std::lock_guard<std::mutex> lock(target_mutex_);
   target_position_ = *msg;
   target_received_ = true;
-  new_target_available_ = true;
+//   new_target_available_ = true;
 }
 
 void TargetNavigationNode::refereeCallback(const rm_interfaces::msg::Referee::SharedPtr msg)
@@ -79,9 +79,8 @@ void TargetNavigationNode::timerCallback()
                              target_position_.y - last_sent_target_.y);
 
     // 发送条件：有新目标 且 (距离变化显著 或 当前没在导航)
-    if (new_target_available_ && (dist > TARGET_DIST_THRESHOLD || !navigation_in_progress_)) {
+    if (dist > TARGET_DIST_THRESHOLD || !navigation_in_progress_) {
         sendNavigationGoal();
-        new_target_available_ = false;
         last_sent_target_ = target_position_;
     }
 }
@@ -140,8 +139,7 @@ void TargetNavigationNode::resultCallback(
             
             if (retry_count_ < MAX_RETRIES) {
                 retry_count_++;
-                // 标记为新目标可用，让下一次 timer 触发重发
-                new_target_available_ = true; 
+                // 由于不再使用new_target_available_，失败后会通过距离检查自动重试
                 RCLCPP_INFO(this->get_logger(), "Retrying goal... (%d/%d)", retry_count_, MAX_RETRIES);
             }
             break;

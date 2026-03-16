@@ -54,7 +54,6 @@ private:
   geometry_msgs::msg::Point target_position_;
   nav_msgs::msg::Odometry current_odometry_;
   bool target_received_;
-  bool new_target_available_;
   int32_t last_game_progress_;
   
   // 互斥锁
