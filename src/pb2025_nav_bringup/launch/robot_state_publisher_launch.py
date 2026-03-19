@@ -29,8 +29,8 @@ from launch_ros.actions import PushRosNamespace, SetRemap
 
 def generate_launch_description():
     # Get the launch directory
-    pkg_pb2025_robot_description_dir = get_package_share_directory(
-        "pb2025_robot_description"
+    pkg_sentry_robot_description_dir = get_package_share_directory(
+        "sentry_robot_description"
     )
 
     namespace = LaunchConfiguration("namespace")
@@ -64,7 +64,7 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(
-                        pkg_pb2025_robot_description_dir,
+                        pkg_sentry_robot_description_dir,
                         "launch",
                         "robot_description_launch.py",
                     )
