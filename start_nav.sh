@@ -3,9 +3,12 @@
 cd /root/ros_ws
 
 source /opt/ros/humble/setup.bash
-source install/setup.bash
 
+# Build against the host-mounted workspace; artifacts stay on the host.
 colcon build --symlink-install
+
+# Source after build so /root/ros_ws/install exists even on a fresh workspace.
+source install/setup.bash
 
 USE_RVIZ=False
 
