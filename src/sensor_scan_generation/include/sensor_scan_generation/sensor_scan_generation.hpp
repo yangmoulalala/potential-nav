@@ -49,12 +49,13 @@ private:
     const std::string & child_frame, const rclcpp::Time & stamp);
 
   void publishOdometry(
-    const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
-    const rclcpp::Time & stamp);
+    const tf2::Transform & transform, const std::string & parent_frame,
+    const std::string & child_frame, const rclcpp::Time & stamp);
 
   std::string lidar_frame_;
   std::string base_frame_;
   std::string robot_base_frame_;
+  bool publish_estimated_twist_ = false;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> br_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_laser_cloud_;
@@ -71,6 +72,9 @@ private:
   std::unique_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
 
   tf2::Transform tf_lidar_to_robot_base_;
+  tf2::Transform previous_robot_base_transform_ = tf2::Transform::getIdentity();
+  rclcpp::Time previous_robot_base_stamp_{0, 0, RCL_ROS_TIME};
+  bool has_previous_robot_base_transform_ = false;
 };
 
 }  // namespace sensor_scan_generation

@@ -26,4 +26,5 @@ exec ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
     slam:=True \
     use_robot_state_pub:=True \
     use_rviz:=$USE_RVIZ \
+    use_respawn:=True \
     "$@"

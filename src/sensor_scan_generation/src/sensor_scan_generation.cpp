@@ -26,10 +26,12 @@ SensorScanGenerationNode::SensorScanGenerationNode(const rclcpp::NodeOptions & o
   this->declare_parameter<std::string>("lidar_frame", "");
   this->declare_parameter<std::string>("base_frame", "");
   this->declare_parameter<std::string>("robot_base_frame", "");
+  this->declare_parameter<bool>("publish_estimated_twist", false);
 
   this->get_parameter("lidar_frame", lidar_frame_);
   this->get_parameter("base_frame", base_frame_);
   this->get_parameter("robot_base_frame", robot_base_frame_);
+  this->get_parameter("publish_estimated_twist", publish_estimated_twist_);
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
@@ -114,8 +116,8 @@ void SensorScanGenerationNode::publishTransform(
 }
 
 void SensorScanGenerationNode::publishOdometry(
-  const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
-  const rclcpp::Time & stamp)
+  const tf2::Transform & transform, const std::string & parent_frame,
+  const std::string & child_frame, const rclcpp::Time & stamp)
 {
   nav_msgs::msg::Odometry out;
   out.header.stamp = stamp;
@@ -128,31 +130,46 @@ void SensorScanGenerationNode::publishOdometry(
   out.pose.pose.position.z = origin.z();
   out.pose.pose.orientation = tf2::toMsg(transform.getRotation());
 
-  static tf2::Transform previous_transform;
-  static auto previous_time = std::chrono::steady_clock::now();
-  const auto current_time = std::chrono::steady_clock::now();
+  if (publish_estimated_twist_ && has_previous_robot_base_transform_) {
+    const double dt = (stamp - previous_robot_base_stamp_).seconds();
+    if (dt > 1e-4) {
+      // Twist must be expressed in child_frame_id, so compute the delta in the robot-base frame.
+      const tf2::Transform delta_transform = previous_robot_base_transform_.inverse() * transform;
+      const tf2::Vector3 linear_velocity = delta_transform.getOrigin() / dt;
 
-  const double dt =
-    std::chrono::duration_cast<std::chrono::nanoseconds>(current_time - previous_time).count() *
-    1e-9;
+      tf2::Quaternion delta_rotation = delta_transform.getRotation();
+      delta_rotation.normalize();
+      const double angle = delta_rotation.getAngle();
+      tf2::Vector3 angular_velocity(0.0, 0.0, 0.0);
+      if (angle > 1e-6) {
+        angular_velocity = delta_rotation.getAxis() * (angle / dt);
+      }
 
-  if (dt > 0) {
-    const auto linear_velocity = (transform.getOrigin() - previous_transform.getOrigin()) / dt;
-
-    const tf2::Quaternion q_diff =
-      transform.getRotation() * previous_transform.getRotation().inverse();
-    const auto angular_velocity = q_diff.getAxis() * q_diff.getAngle() / dt;
-
-    out.twist.twist.linear.x = linear_velocity.x();
-    out.twist.twist.linear.y = linear_velocity.y();
-    out.twist.twist.linear.z = linear_velocity.z();
-    out.twist.twist.angular.x = angular_velocity.x();
-    out.twist.twist.angular.y = angular_velocity.y();
-    out.twist.twist.angular.z = angular_velocity.z();
+      out.twist.twist.linear.x = linear_velocity.x();
+      out.twist.twist.linear.y = linear_velocity.y();
+      out.twist.twist.linear.z = linear_velocity.z();
+      out.twist.twist.angular.x = angular_velocity.x();
+      out.twist.twist.angular.y = angular_velocity.y();
+      out.twist.twist.angular.z = angular_velocity.z();
+    }
   }
 
-  previous_transform = transform;
-  previous_time = current_time;
+  out.pose.covariance[0] = 0.05;
+  out.pose.covariance[7] = 0.05;
+  out.pose.covariance[14] = 0.05;
+  out.pose.covariance[21] = 0.1;
+  out.pose.covariance[28] = 0.1;
+  out.pose.covariance[35] = 0.1;
+  out.twist.covariance[0] = 0.2;
+  out.twist.covariance[7] = 0.2;
+  out.twist.covariance[14] = 0.2;
+  out.twist.covariance[21] = 0.3;
+  out.twist.covariance[28] = 0.3;
+  out.twist.covariance[35] = 0.3;
+
+  previous_robot_base_transform_ = transform;
+  previous_robot_base_stamp_ = stamp;
+  has_previous_robot_base_transform_ = true;
 
   pub_chassis_odometry_->publish(out);
 }
