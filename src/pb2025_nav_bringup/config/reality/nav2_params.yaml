@@ -42,7 +42,7 @@ point_lio:
       lidar_type: 1                                     # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR
       scan_line: 4
       timestamp_unit: 3                                 # the unit of time/t field in the PointCloud2 rostopic: 0-second, 1-milisecond, 2-microsecond, 3-nanosecond.
-      blind: 0.2
+      blind: 0.5
 
     mapping:
       imu_en: True
@@ -112,7 +112,7 @@ terrain_analysis:
     considerDrop: False                 # 考虑凹下去的地面,开启则将相对于地面点的高度取绝对值
     limitGroundLift: False
     maxGroundLift: 0.3
-    clearDyObs: True            # yang注释错误        # 清除动态物体的话，有动态物体走过的地方就走不了了
+    clearDyObs: True                    # 清除动态物体的话，有动态物体走过的地方就走不了了
     minDyObsDis: 0.3                    # 以下参数都是在 clear_dy_obs 的情况下才有用的
     minDyObsAngle: 0.0
     minDyObsRelZ: -0.3
@@ -126,8 +126,8 @@ terrain_analysis:
     vehicleHeight: 0.8                  # 小于车辆高度的点才会进行处理    yang
     voxelPointUpdateThre: 100
     voxelTimeUpdateThre: 1.0
-    minRelZ: -1.0                       # min_rel_z 以及 max_rel_z 限制了有效点云点的Z值范围，用于对天花板和地板进行处理
-    maxRelZ: 0.8                        # yang
+    minRelZ: -1.5                       # min_rel_z 以及 max_rel_z 限制了有效点云点的Z值范围，用于对天花板和地板进行处理
+    maxRelZ: 0.5
     disRatioZ: 0.2                      # Z 值的最大最小范围由这两个值决定，但是并不等于这两个值，是有一个比例关系的，距离机器人越远，限定范围就越大，这其中考虑了坡度
 
 terrain_analysis_ext:
@@ -138,7 +138,7 @@ terrain_analysis_ext:
     clearingDis: 20.0
     useSorting: true
     quantileZ: 0.2
-    vehicleHeight: 0.1
+    vehicleHeight: 1.0
     voxelPointUpdateThre: 100
     voxelTimeUpdateThre: 2.0
     lowerBoundZ: -1.5
@@ -164,7 +164,7 @@ fake_vel_transform:
 small_gicp_relocalization:
   ros__parameters:
     use_sim_time: False
-    num_threads: 2
+    num_threads: 4
     num_neighbors: 20
     global_leaf_size: 0.1
     registered_leaf_size: 0.05
@@ -275,7 +275,7 @@ bt_navigator:
     global_frame: map
     robot_base_frame: gimbal_yaw_fake
     odom_topic: odometry
-    bt_loop_duration: 50
+    bt_loop_duration: 10
     default_server_timeout: 100
     wait_for_service_timeout: 1000
     default_nav_to_pose_bt_xml: $(find-pkg-share pb2025_nav_bringup)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml
@@ -343,12 +343,12 @@ controller_server:
     controller_plugins: ["FollowPath"]
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.3  # yang 机器人必须在10秒内至少移动0.3米
-      movement_time_allowance: 10.0  # yang 机器人必须在10秒内至少移动0.3米,否则出发恢复行为
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.3
+      xy_goal_tolerance: 0.15
       yaw_goal_tolerance: 6.28
     FollowPath:
       plugin: "pb_omni_pid_pursuit_controller::OmniPidPursuitController"
@@ -371,8 +371,8 @@ controller_server:
       use_rotate_to_heading_treshold: 0.1
       min_approach_linear_velocity: 0.5
       approach_velocity_scaling_dist: 1.0
-      v_linear_min: -2.0  # yang
-      v_linear_max: 2.0   #yang
+      v_linear_min: -2.5
+      v_linear_max: 2.5
       v_angular_min: -3.0
       v_angular_max: 3.0
       curvature_min: 0.4                                # 低曲率阈值，低于此值不减速。
@@ -387,7 +387,7 @@ local_costmap:
     ros__parameters:
       use_sim_time: False
       update_frequency: 10.0
-      publish_frequency: 5.0
+      publish_frequency: 10.0
       global_frame: odom
       robot_base_frame: gimbal_yaw_fake
       rolling_window: true
@@ -410,7 +410,7 @@ local_costmap:
         z_voxels: 16
         min_obstacle_height: 0.0
         max_obstacle_height: 2.0
-        min_obstacle_intensity: 0.03
+        min_obstacle_intensity: 0.1
         max_obstacle_intensity: 2.0
         observation_sources: terrain_map
         terrain_map:
@@ -429,7 +429,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.3
+        inflation_radius: 0.7
       always_send_full_costmap: False
 
 global_costmap:
@@ -458,7 +458,7 @@ global_costmap:
         z_voxels: 16
         min_obstacle_height: 0.0
         max_obstacle_height: 2.0
-        min_obstacle_intensity: 0.05
+        min_obstacle_intensity: 0.1
         max_obstacle_intensity: 2.0
         observation_sources: terrain_map_ext
         terrain_map_ext:
@@ -477,7 +477,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.3
+        inflation_radius: 0.7
       always_send_full_costmap: False
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -566,9 +566,9 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [1.0, 1.0, 3.0] # yang
-    min_velocity: [-1.0, -1.0, -3.0]  # yang
-    max_accel: [3.0, 3.0, 3.0]  # yang
+    max_velocity: [2.5, 2.5, 3.0]
+    min_velocity: [-2.5, -2.5, -3.0]
+    max_accel: [4.5, 4.5, 5.0]
     max_decel: [-4.5, -4.5, -5.0]
     odom_topic: "odometry"
     odom_duration: 0.1

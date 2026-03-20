@@ -26,11 +26,11 @@ TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
   
   // 创建订阅者
   target_position_sub_ = this->create_subscription<geometry_msgs::msg::Point>(
-      "target_position", 10,
+      "/mavlink/target_position", 10,
       std::bind(&TargetNavigationNode::targetPositionCallback, this, std::placeholders::_1));
   
   referee_sub_ = this->create_subscription<rm_interfaces::msg::Referee>(
-      "/referee", 10,
+      "/mavlink/referee", 10,
       std::bind(&TargetNavigationNode::refereeCallback, this, std::placeholders::_1));
   
   odometry_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
