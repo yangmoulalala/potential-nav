@@ -98,6 +98,7 @@ void FakeVelTransform::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr
   if (
     is_zero_vel ||
     (rclcpp::Clock().now() - last_controller_activate_time_).seconds() > CONTROLLER_TIMEOUT) {
+    latest_cmd_vel_.reset();
     // If received velocity cannot be synchronized, publish it directly
     auto aft_tf_vel = transformVelocity(msg, current_robot_base_angle_);
     cmd_vel_chassis_pub_->publish(aft_tf_vel);
@@ -123,6 +124,7 @@ void FakeVelTransform::syncCallback(
       return;
     }
     current_cmd_vel = latest_cmd_vel_;
+    latest_cmd_vel_.reset();
   }
 
   current_robot_base_angle_ = tf2::getYaw(odom_msg->pose.pose.orientation);
