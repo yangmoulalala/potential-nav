@@ -8,7 +8,7 @@
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <nav2_msgs/srv/clear_entire_costmap.hpp>
 #include <std_msgs/msg/header.hpp>
-#include <rm_interfaces/msg/referee.hpp>
+#include <std_msgs/msg/float32_multi_array.hpp>
 #include <mutex>
 
 class TargetNavigationNode : public rclcpp::Node
@@ -19,7 +19,7 @@ public:
 private:
   void targetPositionCallback(const geometry_msgs::msg::Point::SharedPtr msg);
   
-  void refereeCallback(const rm_interfaces::msg::Referee::SharedPtr msg);
+  void refereeCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
   
   void odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
   
@@ -37,7 +37,7 @@ private:
 
   // 订阅者
   rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr target_position_sub_;
-  rclcpp::Subscription<rm_interfaces::msg::Referee>::SharedPtr referee_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr referee_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_sub_;
   
   // Action客户端

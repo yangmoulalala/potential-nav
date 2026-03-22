@@ -9,9 +9,9 @@ TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
   
   // 创建客户端用于清理代价地图
   local_costmap_clear_client_ = this->create_client<nav2_msgs::srv::ClearEntireCostmap>(
-      "local_costmap/clear_entirely");
+      "local_costmap/clear_entirely_local_costmap");
   global_costmap_clear_client_ = this->create_client<nav2_msgs::srv::ClearEntireCostmap>(
-      "global_costmap/clear_entirely");
+      "global_costmap/clear_entirely_global_costmap");
   
   
   // 创建Action客户端
@@ -29,7 +29,7 @@ TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
       "/mavlink/target_position", 10,
       std::bind(&TargetNavigationNode::targetPositionCallback, this, std::placeholders::_1));
   
-  referee_sub_ = this->create_subscription<rm_interfaces::msg::Referee>(
+  referee_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
       "/mavlink/referee", 10,
       std::bind(&TargetNavigationNode::refereeCallback, this, std::placeholders::_1));
   
@@ -53,14 +53,23 @@ void TargetNavigationNode::targetPositionCallback(const geometry_msgs::msg::Poin
 //   new_target_available_ = true;
 }
 
-void TargetNavigationNode::refereeCallback(const rm_interfaces::msg::Referee::SharedPtr msg)
+void TargetNavigationNode::refereeCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
+  // 检查数据是否足够
+  if (msg->data.size() < 4) {
+    RCLCPP_WARN(this->get_logger(), "Referee message data size is less than 4");
+    return;
+  }
+  
+  // 从Float32MultiArray中提取game_progress（第一个元素）
+  int32_t current_game_progress = static_cast<int32_t>(msg->data[1]);
+  
   // 检查game_progress是否从其他状态变为2
-  if (last_game_progress_ != 2 && msg->game_progress == 2) {
+  if (last_game_progress_ != 2 && current_game_progress == 2) {
     RCLCPP_INFO(this->get_logger(), "Game progress changed to 2, clearing costmaps");
     clearCostmaps();
   }
-  last_game_progress_ = msg->game_progress;
+  last_game_progress_ = current_game_progress;
 }
 
 void TargetNavigationNode::odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -155,15 +164,38 @@ void TargetNavigationNode::resultCallback(
 
 void TargetNavigationNode::clearCostmaps()
 {
-  // 清理局部代价地图
+  RCLCPP_INFO(this->get_logger(), "Sending requests to clear costmaps...");
+
+  // 1. 清理局部代价地图
   auto local_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
-  auto local_result = local_costmap_clear_client_->async_send_request(local_request);
   
-  // 清理全局代价地图
+  // 使用带有 Lambda 回调的异步发送
+  local_costmap_clear_client_->async_send_request(
+    local_request,
+    [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
+      auto response = future.get();
+      if (response) {
+        RCLCPP_INFO(this->get_logger(), "Local costmap cleared successfully");
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to clear local costmap");
+      }
+    }
+  );
+
+  // 2. 清理全局代价地图
   auto global_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
-  auto global_result = global_costmap_clear_client_->async_send_request(global_request);
   
-  RCLCPP_INFO(this->get_logger(), "Sent requests to clear both local and global costmaps");
+  global_costmap_clear_client_->async_send_request(
+    global_request,
+    [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
+      auto response = future.get();
+      if (response) {
+        RCLCPP_INFO(this->get_logger(), "Global costmap cleared successfully");
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to clear global costmap");
+      }
+    }
+  );
 }
 
 int main(int argc, char **argv)

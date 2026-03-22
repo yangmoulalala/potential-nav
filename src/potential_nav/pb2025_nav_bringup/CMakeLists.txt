@@ -10,8 +10,6 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(rm_interfaces REQUIRED)
-
 if(BUILD_TESTING)
 find_package(ament_lint_auto REQUIRED)
   list(APPEND AMENT_LINT_AUTO_EXCLUDE
@@ -36,7 +34,6 @@ ament_target_dependencies(target_navigation_node
   nav_msgs
   nav2_msgs
   std_msgs
-  rm_interfaces
 )
 
 # 安装头文件
