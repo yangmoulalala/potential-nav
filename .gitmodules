@@ -1,3 +1,3 @@
-[submodule "src/rm_interface"]
-	path = src/rm_interface
+[submodule "src/rm_interfaces"]
+	path = src/rm_interfaces
 	url = https://github.com/yangmoulalala/rm_interfaces.git

@@ -47,7 +47,7 @@
   <test_depend>ament_cmake_clang_format</test_depend>
   <test_depend>ament_cmake_black</test_depend>
   
-  <depend>tf2</depend>
+  <depend>rm_interfaces</depend>
 
 
   <export>
