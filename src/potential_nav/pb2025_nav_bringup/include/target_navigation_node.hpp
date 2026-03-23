@@ -7,9 +7,13 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <nav2_msgs/srv/clear_entire_costmap.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <std_msgs/msg/header.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <mutex>
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 
 class TargetNavigationNode : public rclcpp::Node
 {
@@ -17,12 +21,10 @@ public:
   explicit TargetNavigationNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
 private:
-  void targetPositionCallback(const geometry_msgs::msg::Point::SharedPtr msg);
-  
-  void refereeCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
-  
+  void nav_c_Callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
   void odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
   
+  void cmd_vel_Callback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void timerCallback();
   
   void sendNavigationGoal();
@@ -33,13 +35,17 @@ private:
   void resultCallback(
     const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::WrappedResult &result);
   
+  void RestartContainer();
   void clearCostmaps();
 
   // 订阅者
-  rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr target_position_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr referee_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr nav_c_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   
+  // 发布者
+  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr nav_pc_pub_;
+
   // Action客户端
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
   
@@ -53,8 +59,9 @@ private:
   // 数据成员
   geometry_msgs::msg::Point target_position_;
   nav_msgs::msg::Odometry current_odometry_;
+  bool is_restart_;
   bool target_received_;
-  int32_t last_game_progress_;
+  bool last_is_restart_;
   
   // 互斥锁
   std::mutex target_mutex_;

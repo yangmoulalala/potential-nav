@@ -5,7 +5,6 @@ TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
 {
   // 初始化参数
   target_received_ = false;
-  last_game_progress_ = -1;
   
   // 创建客户端用于清理代价地图
   local_costmap_clear_client_ = this->create_client<nav2_msgs::srv::ClearEntireCostmap>(
@@ -25,57 +24,72 @@ TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
   }
   
   // 创建订阅者
-  target_position_sub_ = this->create_subscription<geometry_msgs::msg::Point>(
-      "/mavlink/target_position", 10,
-      std::bind(&TargetNavigationNode::targetPositionCallback, this, std::placeholders::_1));
-  
-  referee_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-      "/mavlink/referee", 10,
-      std::bind(&TargetNavigationNode::refereeCallback, this, std::placeholders::_1));
+  nav_c_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+      "/mavlink/nav/c", 1,
+      std::bind(&TargetNavigationNode::nav_c_Callback, this, std::placeholders::_1));
   
   odometry_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "odometry", 10,
       std::bind(&TargetNavigationNode::odometryCallback, this, std::placeholders::_1));
+
+  cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+      "cmd_vel", 10,
+      std::bind(&TargetNavigationNode::cmd_vel_Callback, this, std::placeholders::_1));
+
+  // 发布者
+  nav_pc_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("/mavlink/nav/pc", 1);
   
   // 创建定时器，用于定期检查是否需要发送新的目标点
   timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(500),  // 500ms = 2Hz
+      std::chrono::milliseconds(100),  // 100ms = 10Hz
       std::bind(&TargetNavigationNode::timerCallback, this));
   
   RCLCPP_INFO(this->get_logger(), "Target navigation node initialized");
 }
 
-void TargetNavigationNode::targetPositionCallback(const geometry_msgs::msg::Point::SharedPtr msg)
+void TargetNavigationNode::nav_c_Callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(target_mutex_);
-  target_position_ = *msg;
-  target_received_ = true;
-//   new_target_available_ = true;
-}
-
-void TargetNavigationNode::refereeCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-{
-  // 检查数据是否足够
-  if (msg->data.size() < 4) {
-    RCLCPP_WARN(this->get_logger(), "Referee message data size is less than 4");
+  if (msg->data.size() < 3) { 
+    RCLCPP_WARN(this->get_logger(), "nav_c message too short, need at least 3 elements");
     return;
   }
-  
-  // 从Float32MultiArray中提取game_progress（第一个元素）
-  int32_t current_game_progress = static_cast<int32_t>(msg->data[1]);
-  
-  // 检查game_progress是否从其他状态变为2
-  if (last_game_progress_ != 2 && current_game_progress == 2) {
-    RCLCPP_INFO(this->get_logger(), "Game progress changed to 2, clearing costmaps");
-    clearCostmaps();
-  }
-  last_game_progress_ = current_game_progress;
+  std::lock_guard<std::mutex> lock(target_mutex_);
+  last_is_restart_ = is_restart_;
+  is_restart_ = static_cast<bool>(msg.get()->data[0]);
+  target_position_.x = msg.get()->data[1];
+  target_position_.y = msg.get()->data[2];
+  target_received_ = true;
 }
+
 
 void TargetNavigationNode::odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
   std::lock_guard<std::mutex> lock(odometry_mutex_);
   current_odometry_ = *msg;
+}
+
+void TargetNavigationNode::cmd_vel_Callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+  std_msgs::msg::Float32MultiArray nav_pc_msg;
+  nav_pc_msg.data.resize(5);
+  nav_pc_msg.data[0] = msg.get()->linear.x;
+  nav_pc_msg.data[1] = msg.get()->linear.y;
+  nav_pc_msg.data[2] = current_odometry_.pose.pose.position.x;
+  nav_pc_msg.data[3] = current_odometry_.pose.pose.position.y;
+
+  double roll, pitch, yaw;
+  tf2::Quaternion q(
+      current_odometry_.pose.pose.orientation.x,
+      current_odometry_.pose.pose.orientation.y,
+      current_odometry_.pose.pose.orientation.z,
+      current_odometry_.pose.pose.orientation.w
+  );
+  tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+  nav_pc_msg.data[4] = yaw;
+
+  nav_pc_pub_->publish(nav_pc_msg);
+
 }
 
 void TargetNavigationNode::timerCallback()
@@ -91,6 +105,10 @@ void TargetNavigationNode::timerCallback()
     if (dist > TARGET_DIST_THRESHOLD || !navigation_in_progress_) {
         sendNavigationGoal();
         last_sent_target_ = target_position_;
+    }
+
+    if (!last_is_restart_ && is_restart_){
+      RestartContainer();
     }
 }
 
@@ -145,15 +163,15 @@ void TargetNavigationNode::resultCallback(
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_WARN(this->get_logger(), "Navigation aborted! Potential obstacle. Clearing costmaps...");
             clearCostmaps(); // 失败后自动清理代价地图
-            
+            sendNavigationGoal();
             if (retry_count_ < MAX_RETRIES) {
                 retry_count_++;
-                // 由于不再使用new_target_available_，失败后会通过距离检查自动重试
                 RCLCPP_INFO(this->get_logger(), "Retrying goal... (%d/%d)", retry_count_, MAX_RETRIES);
             }
             break;
 
         case rclcpp_action::ResultCode::CANCELED:
+            retry_count_ = 0;
             RCLCPP_INFO(this->get_logger(), "Goal canceled");
             break;
 
@@ -162,6 +180,11 @@ void TargetNavigationNode::resultCallback(
     }
 }
 
+void TargetNavigationNode::RestartContainer()
+{
+  RCLCPP_WARN(this->get_logger(), "Restarting container...");
+  exit(1);
+}
 void TargetNavigationNode::clearCostmaps()
 {
   RCLCPP_INFO(this->get_logger(), "Sending requests to clear costmaps...");

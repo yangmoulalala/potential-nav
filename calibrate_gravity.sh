@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- 配置参数 ---
-TOPIC="/sentry/livox/imu"
+TOPIC="/nav/livox/imu"
 DURATION=10
 YAML_FILE="src/pb2025_nav_bringup/config/reality/nav2_params.yaml"
 TEMP_DATA="imu_raw_output.log"

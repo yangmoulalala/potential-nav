@@ -50,7 +50,7 @@ def generate_launch_description():
     # Declare the launch arguments
     declare_namespace_cmd = DeclareLaunchArgument(
         "namespace",
-        default_value="sentry",
+        default_value="nav",
         description="Top-level namespace",
     )
 
