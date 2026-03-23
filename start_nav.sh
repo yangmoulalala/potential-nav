@@ -24,10 +24,10 @@ else
 fi
 
 echo "[INFO] use_rviz = $USE_RVIZ"
-    # slam:=False\
+    # slam:=True\
 
 exec ros2 launch pb2025_nav_bringup rm_navigation_reality_launch.py \
-    world:=rmul_2026\
+    world:=test\
     slam:=True\
     use_robot_state_pub:=True \
     use_rviz:=$USE_RVIZ \
