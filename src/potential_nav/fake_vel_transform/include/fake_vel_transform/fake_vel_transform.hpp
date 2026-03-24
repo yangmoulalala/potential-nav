@@ -70,6 +70,7 @@ private:
   std::string cmd_spin_topic_;
   std::string input_cmd_vel_topic_;
   std::string output_cmd_vel_topic_;
+  bool synchronize_cmd_vel_with_local_plan_;
   float spin_speed_;
 
   std::mutex cmd_vel_mutex_;
