@@ -1,5 +1,6 @@
 services:
   potential-nav:
+    build: .
     image: potential-nav:0.0
     container_name: potential-nav
     network_mode: host
