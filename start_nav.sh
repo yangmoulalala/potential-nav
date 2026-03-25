@@ -12,6 +12,8 @@ colcon build --symlink-install
 # Source after build so /root/ros_ws/install exists even on a fresh workspace.
 source install/setup.bash
 
+export DISPLAY=:0
+
 USE_RVIZ=False
 
 # 核心判断：DISPLAY存在 + 能真正访问X服务
