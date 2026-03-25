@@ -54,7 +54,8 @@ void TargetNavigationNode::refereeCallback(const rm_interfaces::msg::Referee::Sh
   // 检查game_progress是否从其他状态变为2
   if (last_game_progress_ != 2 && msg->game_progress == 2) {
     RCLCPP_INFO(this->get_logger(), "Game progress changed to 2, clearing costmaps");
-    RestartContainer();
+    // RestartContainer();
+    clearCostmaps();
   }
   last_game_progress_ = msg->game_progress;
 }
@@ -127,7 +128,6 @@ void TargetNavigationNode::resultCallback(
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_WARN(this->get_logger(), "Navigation aborted! Potential obstacle. Clearing costmaps...");
             clearCostmaps(); // 失败后自动清理代价地图
-            sendNavigationGoal();
             if (retry_count_ < MAX_RETRIES) {
                 retry_count_++;
                 RCLCPP_INFO(this->get_logger(), "Retrying goal... (%d/%d)", retry_count_, MAX_RETRIES);
