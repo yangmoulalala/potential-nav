@@ -27,6 +27,8 @@ FakeVelTransform::FakeVelTransform(const rclcpp::NodeOptions & options)
 : Node("fake_vel_transform", options)
 {
   RCLCPP_INFO(get_logger(), "Start FakeVelTransform!");
+  RCLCPP_INFO(
+    get_logger(), "Clock type: %d", static_cast<int>(this->get_clock()->get_clock_type()));
 
   this->declare_parameter<std::string>("robot_base_frame", "gimbal_link");
   this->declare_parameter<std::string>("fake_robot_base_frame", "gimbal_link_fake");
@@ -99,7 +101,7 @@ void FakeVelTransform::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr
   const bool is_zero_vel = std::abs(msg->linear.x) < EPSILON && std::abs(msg->linear.y) < EPSILON &&
                            std::abs(msg->angular.z) < EPSILON;
   const bool controller_timed_out =
-    (rclcpp::Clock().now() - last_controller_activate_time_).seconds() > CONTROLLER_TIMEOUT;
+    (this->get_clock()->now() - last_controller_activate_time_).seconds() > CONTROLLER_TIMEOUT;
 
   if (is_zero_vel || controller_timed_out || !synchronize_cmd_vel_with_local_plan_) {
     latest_cmd_vel_.reset();
@@ -114,7 +116,7 @@ void FakeVelTransform::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr
 void FakeVelTransform::localPlanCallback(const nav_msgs::msg::Path::ConstSharedPtr & /*msg*/)
 {
   // Consider nav2_controller_server is activated when receiving local_plan
-  last_controller_activate_time_ = rclcpp::Clock().now();
+  last_controller_activate_time_ = this->get_clock()->now();
 }
 
 void FakeVelTransform::syncCallback(
