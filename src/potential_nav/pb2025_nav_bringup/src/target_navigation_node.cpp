@@ -1,4 +1,7 @@
 #include "target_navigation_node.hpp"
+#include <thread>
+#include <chrono>
+#include <cstdlib>
 
 TargetNavigationNode::TargetNavigationNode(const rclcpp::NodeOptions &options)
     : Node("target_navigation_node", options)
@@ -126,11 +129,14 @@ void TargetNavigationNode::resultCallback(
             break;
 
         case rclcpp_action::ResultCode::ABORTED:
-            RCLCPP_WARN(this->get_logger(), "Navigation aborted! Potential obstacle. Clearing costmaps...");
-            clearCostmaps(); // 失败后自动清理代价地图
+            RCLCPP_WARN(this->get_logger(), "Navigation aborted!");
+
             if (retry_count_ < MAX_RETRIES) {
                 retry_count_++;
                 RCLCPP_INFO(this->get_logger(), "Retrying goal... (%d/%d)", retry_count_, MAX_RETRIES);
+            }else{
+                // clearCostmaps(); 
+                retry_count_ = 0;
             }
             break;
 
@@ -153,37 +159,50 @@ void TargetNavigationNode::clearCostmaps()
 {
   RCLCPP_INFO(this->get_logger(), "Sending requests to clear costmaps...");
 
-  // 1. 清理局部代价地图
-  auto local_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
-  
-  // 使用带有 Lambda 回调的异步发送
-  local_costmap_clear_client_->async_send_request(
-    local_request,
-    [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
-      auto response = future.get();
-      if (response) {
-        RCLCPP_INFO(this->get_logger(), "Local costmap cleared successfully");
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to clear local costmap");
-      }
+  // // 1. 清理局部代价地图
+  // auto local_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
+
+  // local_costmap_clear_client_->async_send_request(
+  //   local_request,
+  //   [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
+  //     auto response = future.get();
+  //     if (response) {
+  //       RCLCPP_INFO(this->get_logger(), "Local costmap cleared successfully");
+  //     } else {
+  //       RCLCPP_ERROR(this->get_logger(), "Failed to clear local costmap");
+  //     }
+  //   }
+  // );
+
+  // // 2. 清理全局代价地图
+  // auto global_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
+
+  // global_costmap_clear_client_->async_send_request(
+  //   global_request,
+  //   [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
+  //     auto response = future.get();
+  //     if (response) {
+  //       RCLCPP_INFO(this->get_logger(), "Global costmap cleared successfully");
+  //     } else {
+  //       RCLCPP_ERROR(this->get_logger(), "Failed to clear global costmap");
+  //     }
+  //   }
+  // );
+
+  // 3. 异步杀掉 slam_toolbox 进程
+  std::thread([this]() {
+    // 杀掉 slam_toolbox 对应进程
+    // 如果 launch 中 respawn=True，会自动重启
+    int ret = std::system("pkill -f sync_slam_toolbox_node");
+
+    if (ret == 0) {
+      RCLCPP_WARN(this->get_logger(), "slam_toolbox process killed");
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Failed to kill slam_toolbox process");
     }
-  );
-  
-  // 2. 清理全局代价地图
-  auto global_request = std::make_shared<nav2_msgs::srv::ClearEntireCostmap::Request>();
-  
-  global_costmap_clear_client_->async_send_request(
-    global_request,
-    [this](rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedFuture future) {
-      auto response = future.get();
-      if (response) {
-        RCLCPP_INFO(this->get_logger(), "Global costmap cleared successfully");
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to clear global costmap");
-      }
-    }
-  );
+  }).detach();
 }
+
 
 int main(int argc, char **argv)
 {

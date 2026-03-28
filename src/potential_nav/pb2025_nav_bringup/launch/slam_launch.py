@@ -129,7 +129,7 @@ def generate_launch_description():
         name="slam_toolbox",
         output="screen",
         respawn=use_respawn,
-        respawn_delay=2.0,
+        respawn_delay=0.0,
         parameters=[configured_params],
         arguments=["--ros-args", "--log-level", log_level],
         remappings=[

@@ -23,7 +23,7 @@
                               service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
-      <ReactiveFallback name="RecoveryFallback">
+      <!-- <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
           <Sequence name="ClearingActions">
@@ -35,7 +35,30 @@
           <BackUp backup_dist="1.0"
                   backup_speed="1.0"/>
         </RoundRobin>
+      </ReactiveFallback> -->
+      <ReactiveFallback name="RecoveryFallback">
+
+        <!-- 如果目标更新，立即中止恢复 -->
+        <GoalUpdated/>
+
+        <RoundRobin name="RecoveryActions">
+
+          <!-- 第一次触发：清理 costmap -->
+          <Sequence name="ClearCostmapsSequence">
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree"
+                                service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+
+          <!-- 第二次触发：等待 -->
+          <Wait name="WaitBeforeRetry"
+                wait_duration="2.0"/>
+
+        </RoundRobin>
+
       </ReactiveFallback>
+      
     </RecoveryNode>
   </BehaviorTree>
 </root>
